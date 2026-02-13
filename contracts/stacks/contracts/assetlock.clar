@@ -1,36 +1,37 @@
-;; AssetLock - Time-locked vault
+;; AssetLock Clarity Contract
+;; Time-locked asset vesting contract.
 
-(define-data-var lock-counter uint u0)
 
-(define-map locks uint {
-    owner: principal,
-    beneficiary: principal,
-    amount: uint,
-    unlock-block: uint,
-    withdrawn: bool
-})
+(define-map locks
+    uint
+    {
+        owner: principal,
+        amount: uint,
+        unlock-height: uint
+    }
+)
+(define-data-var lock-nonce uint u0)
 
-(define-constant ERR-NOT-UNLOCKED (err u100))
-(define-constant ERR-UNAUTHORIZED (err u101))
-
-(define-public (create-lock (beneficiary principal) (duration uint))
-    (let ((lock-id (var-get lock-counter)))
-        (try! (stx-transfer? tx-sender (as-contract tx-sender) tx-sender))
-        (map-set locks lock-id {
+(define-public (lock (amount uint) (duration uint))
+    (let ((id (var-get lock-nonce)))
+        (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+        (map-set locks id {
             owner: tx-sender,
-            beneficiary: beneficiary,
-            amount: u0,
-            unlock-block: (+ block-height duration),
-            withdrawn: false
+            amount: amount,
+            unlock-height: (+ block-height duration)
         })
-        (var-set lock-counter (+ lock-id u1))
-        (ok lock-id)))
+        (var-set lock-nonce (+ id u1))
+        (ok id)
+    )
+)
 
-(define-public (withdraw-lock (lock-id uint))
-    (let ((lock (unwrap! (map-get? locks lock-id) ERR-UNAUTHORIZED)))
-        (asserts! (is-eq (get beneficiary lock) tx-sender) ERR-UNAUTHORIZED)
-        (asserts! (>= block-height (get unlock-block lock)) ERR-NOT-UNLOCKED)
-        (ok true)))
+(define-public (unlock (id uint))
+    (let ((l (unwrap! (map-get? locks id) (err u404))))
+        (asserts! (is-eq tx-sender (get owner l)) (err u401))
+        (asserts! (>= block-height (get unlock-height l)) (err u100))
+        (try! (as-contract (stx-transfer? (get amount l) tx-sender (get owner l))))
+        (map-delete locks id)
+        (ok true)
+    )
+)
 
-(define-read-only (get-lock (lock-id uint))
-    (ok (map-get? locks lock-id)))
