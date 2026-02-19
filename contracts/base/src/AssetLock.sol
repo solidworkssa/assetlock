@@ -2,8 +2,11 @@
 pragma solidity ^0.8.20;
 
 /// @title AssetLock Contract
+/// @author solidworkssa
 /// @notice Time-locked asset vesting contract.
 contract AssetLock {
+    string public constant VERSION = "1.0.0";
+
 
     struct Lock {
         address owner;
