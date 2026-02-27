@@ -28,9 +28,9 @@
 
 (define-public (lock (amount uint) (duration uint))
     (let ((id (var-get lock-nonce)))
-        (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+        (try! (stx-transfer? amount contract-caller (as-contract contract-caller)))
         (map-set locks id {
-            owner: tx-sender,
+            owner: contract-caller,
             amount: amount,
             unlock-height: (+ block-height duration)
         })
@@ -41,9 +41,9 @@
 
 (define-public (unlock (id uint))
     (let ((l (unwrap! (map-get? locks id) (err u404))))
-        (asserts! (is-eq tx-sender (get owner l)) (err u401))
+        (asserts! (is-eq contract-caller (get owner l)) (err u401))
         (asserts! (>= block-height (get unlock-height l)) (err u100))
-        (try! (as-contract (stx-transfer? (get amount l) tx-sender (get owner l))))
+        (try! (as-contract (stx-transfer? (get amount l) contract-caller (get owner l))))
         (map-delete locks id)
         (ok true)
     )
